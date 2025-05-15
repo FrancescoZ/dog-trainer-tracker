@@ -10,6 +10,7 @@ import DogsStackNavigator from './DogsStackNavigator';
 import ExercisesStackNavigator from './ExercisesStackNavigator';
 import TrainingStackNavigator from './TrainingStackNavigator';
 import AnalyticsStackNavigator from './AnalyticsStackNavigator';
+import SettingsStackNavigator from './SettingsStackNavigator';
 
 // Define our navigation types
 export type RootTabParamList = {
@@ -17,6 +18,7 @@ export type RootTabParamList = {
   Exercises: undefined;
   Training: undefined;
   Analytics: undefined;
+  Settings: undefined;
 };
 
 // Define default screen options to pass to all navigators
@@ -73,6 +75,8 @@ const AppNavigator = () => {
               iconName = focused ? 'fitness' : 'fitness-outline';
             } else if (route.name === 'Analytics') {
               iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+            } else if (route.name === 'Settings') {
+              iconName = focused ? 'settings' : 'settings-outline';
             } else {
               iconName = 'help-circle-outline';
             }
@@ -88,6 +92,7 @@ const AppNavigator = () => {
         <Tab.Screen name="Training" component={TrainingStackNavigator} />
         <Tab.Screen name="Exercises" component={ExercisesStackNavigator} />
         <Tab.Screen name="Dogs" component={DogsStackNavigator} />
+        <Tab.Screen name="Settings" component={SettingsStackNavigator} />
       </Tab.Navigator>
     </NavigationContainer>
   );
