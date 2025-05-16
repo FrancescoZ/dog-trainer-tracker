@@ -105,8 +105,9 @@ const ExerciseProgressScreen = () => {
         repetitions: exerciseData.repetitions,
         successfulCompletions: exerciseData.successfulCompletions,
         sessionId: session.id,
+        time: exerciseData.time || 0,
       };
-    }).filter(Boolean);
+    }).filter((data): data is NonNullable<typeof data> => data !== null);
   }, [sortedSessions, exerciseId]);
   
   // Prepare distraction level data
@@ -136,6 +137,17 @@ const ExerciseProgressScreen = () => {
     }));
   }, [progressData]);
   
+  // Prepare time data, filtering out any entries with no time data
+  const timeData = React.useMemo(() => {
+    return progressData
+      .filter(data => data.time > 0) // Only include entries with time data
+      .map(data => ({
+        x: data.formattedDate,
+        y: data.time,
+        date: data.date,
+      }));
+  }, [progressData]);
+  
   // Render empty state if no data
   if (!exercise) {
     return (
@@ -154,7 +166,10 @@ const ExerciseProgressScreen = () => {
         message={`No training sessions found for ${exercise.name}`}
         icon="trending-up"
         buttonText="Start Training"
-        onButtonPress={() => navigation.navigate('Training')}
+        onButtonPress={() => {
+          // Use parent navigation to navigate to the Training tab
+          navigation.getParent()?.navigate('Training');
+        }}
       />
     );
   }
@@ -402,6 +417,55 @@ const ExerciseProgressScreen = () => {
               </VictoryChart>
             </>
           ) : null}
+          
+          {timeData.length > 0 ? (
+            <>
+              <Text variant="bodyMedium" style={styles.chartLabel}>Time (seconds)</Text>
+              <VictoryChart
+                theme={VictoryTheme.material}
+                width={width - 64}
+                height={200}
+                padding={{ top: 20, bottom: 50, left: 50, right: 20 }}
+              >
+                <VictoryAxis
+                  dependentAxis
+                  tickFormat={(x) => typeof x === 'number' ? Math.round(x).toString() : ''}
+                  style={{
+                    grid: { stroke: "lightgray", strokeWidth: 0.5 }
+                  }}
+                />
+                <VictoryAxis
+                  tickFormat={(x, i) => {
+                    if (i < 0 || i >= timeData.length) return '';
+                    if (timeData.length <= 5 || i % Math.ceil(timeData.length / 5) === 0) {
+                      return typeof x === 'string' ? x.slice(0, 6) : '';
+                    }
+                    return '';
+                  }}
+                  style={{
+                    tickLabels: { angle: -45, textAnchor: 'end' }
+                  }}
+                />
+                <VictoryLine
+                  data={timeData}
+                  x="x"
+                  y="y"
+                  style={{
+                    data: { stroke: "#FF8A65", strokeWidth: 2 }
+                  }}
+                />
+                <VictoryScatter
+                  data={timeData}
+                  x="x"
+                  y="y"
+                  size={4}
+                  style={{
+                    data: { fill: "#FF8A65" }
+                  }}
+                />
+              </VictoryChart>
+            </>
+          ) : null}
         </Card.Content>
       </Card>
       
@@ -416,6 +480,7 @@ const ExerciseProgressScreen = () => {
               <DataTable.Title numeric>Reps</DataTable.Title>
               <DataTable.Title numeric>Success</DataTable.Title>
               <DataTable.Title numeric>Rate</DataTable.Title>
+              <DataTable.Title numeric>Time</DataTable.Title>
             </DataTable.Header>
             
             {progressData.slice(0, 5).map((data, index) => {
@@ -427,7 +492,15 @@ const ExerciseProgressScreen = () => {
               return (
                 <DataTable.Row 
                   key={index}
-                  onPress={() => navigation.navigate('TrainingDetail', { sessionId: data.sessionId })}
+                  onPress={() => {
+                    // We need to navigate to a different stack, so use the root navigation
+                    const rootNav = navigation.getParent();
+                    if (rootNav) {
+                      rootNav.navigate('Training');
+                      // Note: We can't directly navigate to TrainingDetail from here
+                      // The user will need to navigate from the Training tab
+                    }
+                  }}
                 >
                   <DataTable.Cell>
                     <View>
@@ -438,6 +511,7 @@ const ExerciseProgressScreen = () => {
                   <DataTable.Cell numeric>{data.repetitions}</DataTable.Cell>
                   <DataTable.Cell numeric>{data.successfulCompletions}</DataTable.Cell>
                   <DataTable.Cell numeric>{Math.round(data.successRate)}%</DataTable.Cell>
+                  <DataTable.Cell numeric>{data.time.toFixed(2)} seconds</DataTable.Cell>
                 </DataTable.Row>
               );
             })}

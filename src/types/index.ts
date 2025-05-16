@@ -29,6 +29,7 @@ export interface ExerciseRecord {
   repetitions: number;
   successfulCompletions: number;
   teachingMethods: TeachingMethod[];
+  time?: number; // time in seconds for the exercise
 }
 
 // Extended version of ExerciseRecord that includes an id

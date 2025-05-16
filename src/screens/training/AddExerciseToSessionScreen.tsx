@@ -38,6 +38,7 @@ const AddExerciseToSessionScreen = () => {
   const [repetitions, setRepetitions] = useState<number>(5);
   const [successfulCompletions, setSuccessfulCompletions] = useState<number>(0);
   const [teachingMethods, setTeachingMethods] = useState<TeachingMethod[]>(['positive-reinforcement']);
+  const [time, setTime] = useState<number>(0); // Time in seconds
   
   // Check if there's an active session, but only if we're not adding to a past session
   useEffect(() => {
@@ -87,6 +88,7 @@ const AddExerciseToSessionScreen = () => {
       repetitions,
       successfulCompletions,
       teachingMethods,
+      time, // Add time field to the exercise data
     };
     
     if (isPastSession) {
@@ -213,6 +215,16 @@ const AddExerciseToSessionScreen = () => {
               setSuccessfulCompletions(Math.min(value, repetitions));
             }}
             style={styles.input}
+          />
+          
+          <Text variant="bodyMedium" style={styles.label}>Time (seconds)</Text>
+          <TextInput
+            mode="outlined"
+            keyboardType="numeric"
+            value={time.toString()}
+            onChangeText={text => setTime(Number(text) || 0)}
+            style={styles.input}
+            placeholder="Time spent on this exercise in seconds"
           />
           
           <Text variant="bodyMedium" style={styles.label}>Teaching Methods</Text>
