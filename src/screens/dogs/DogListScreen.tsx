@@ -6,31 +6,28 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DogsStackParamList } from '../../navigation/DogsStackNavigator';
 import { useDogStore } from '../../store/dogStore';
 import EmptyState from '../../components/EmptyState';
+import { Dog } from '../../types';
 
 type DogListScreenNavigationProp = NativeStackNavigationProp<DogsStackParamList, 'DogList'>;
 
 const DogListScreen = () => {
   const navigation = useNavigation<DogListScreenNavigationProp>();
   const theme = useTheme();
-  const { dogs, currentDogId, setCurrentDog } = useDogStore();
+  const { dogs } = useDogStore();
 
   const handleAddDog = () => {
     navigation.navigate('AddDog');
   };
 
   const handleDogPress = (dogId: string) => {
-    setCurrentDog(dogId);
     navigation.navigate('DogDetail', { dogId });
   };
 
-  // Render a dog card
-  const renderDogItem = ({ item }) => (
+  // Render a dog card with proper typing
+  const renderDogItem = ({ item }: { item: Dog }) => (
     <TouchableOpacity onPress={() => handleDogPress(item.id)}>
       <Card 
-        style={[
-          styles.dogCard, 
-          currentDogId === item.id && { borderColor: theme.colors.primary, borderWidth: 2 }
-        ]}
+        style={styles.dogCard}
       >
         <Card.Content style={styles.dogCardContent}>
           <View style={styles.dogInfo}>

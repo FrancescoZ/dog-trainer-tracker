@@ -1,76 +1,115 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Image, Alert } from 'react-native';
 import { Text, Card, Button, IconButton, useTheme, Portal, Dialog } from 'react-native-paper';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DogsStackParamList } from '../../navigation/DogsStackNavigator';
 import { useDogStore } from '../../store/dogStore';
 import { useTrainingStore } from '../../store/trainingStore';
 import { formatDate, calculateSuccessRate } from '../../utils/helpers';
+import { Dog, TrainingSession } from '../../types';
 
 type DogDetailScreenRouteProp = RouteProp<DogsStackParamList, 'DogDetail'>;
 type DogDetailScreenNavigationProp = NativeStackNavigationProp<DogsStackParamList>;
 
 const DogDetailScreen = () => {
+  // Use useRef to prevent updates from causing infinite loops
+  const isFirstRender = useRef(true);
   const route = useRoute<DogDetailScreenRouteProp>();
   const navigation = useNavigation<DogDetailScreenNavigationProp>();
   const theme = useTheme();
-  const { dogId } = route.params;
+  const dogId = route.params?.dogId;
 
-  // State
+  // Local component state
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
-  
-  // Get dog details
-  const { dogs, deleteDog } = useDogStore();
-  const dog = dogs.find((d) => d.id === dogId);
-  
-  // Get training sessions for this dog
-  const sessions = useTrainingStore((state) => 
-    state.sessions.filter((session) => session.dogId === dogId)
-  );
-
-  // Calculate statistics
-  const totalSessions = sessions.length;
-  const lastTrainingDate = sessions.length > 0
-    ? Math.max(...sessions.map(s => s.startTime))
-    : null;
-
-  // Calculate overall success rate
-  let totalSuccessful = 0;
-  let totalRepetitions = 0;
-  sessions.forEach(session => {
-    session.exercises.forEach(exercise => {
-      totalSuccessful += exercise.successfulCompletions;
-      totalRepetitions += exercise.repetitions;
-    });
+  const [dogData, setDogData] = useState<Dog | null>(null);
+  const [sessionData, setSessionData] = useState<TrainingSession[]>([]);
+  const [stats, setStats] = useState({
+    totalSessions: 0,
+    lastTrainingDate: null as number | null,
+    successRate: 0
   });
-  const overallSuccessRate = calculateSuccessRate(totalSuccessful, totalRepetitions);
 
+  // Load data only once on initial render
   useEffect(() => {
-    // Set header right button for editing
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      
+      // Fetch dog data
+      const dog = useDogStore.getState().dogs.find(d => d.id === dogId);
+      setDogData(dog || null);
+      
+      // Fetch session data
+      const sessions = useTrainingStore.getState().sessions.filter(s => s.dogId === dogId);
+      setSessionData(sessions);
+      
+      // Calculate stats
+      const totalSessions = sessions.length;
+      const lastTrainingDate = sessions.length > 0
+        ? Math.max(...sessions.map(s => s.startTime))
+        : null;
+        
+      let totalSuccessful = 0;
+      let totalRepetitions = 0;
+      sessions.forEach(session => {
+        session.exercises.forEach(exercise => {
+          totalSuccessful += exercise.successfulCompletions;
+          totalRepetitions += exercise.repetitions;
+        });
+      });
+      
+      setStats({
+        totalSessions,
+        lastTrainingDate,
+        successRate: calculateSuccessRate(totalSuccessful, totalRepetitions)
+      });
+    }
+  }, [dogId]);
+
+  // Memoize button handlers to prevent recreating functions on re-render
+  const navigateToTraining = useCallback(() => {
+    try {
+      // Use CommonActions to reset the state and avoid loops
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.dispatch(
+          CommonActions.navigate({
+            name: 'Training'
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  }, [navigation]);
+
+  const handleDeleteDog = useCallback(() => {
+    try {
+      useDogStore.getState().deleteDog(dogId);
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error deleting dog:', error);
+    }
+  }, [dogId, navigation]);
+
+  const navigateToEditDog = useCallback(() => {
+    navigation.navigate('EditDog', { dogId });
+  }, [dogId, navigation]);
+
+  // Set header options
+  useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: 'row' }}>
-          <IconButton
-            icon="pencil"
-            onPress={() => navigation.navigate('EditDog', { dogId })}
-          />
-          <IconButton
-            icon="delete"
-            onPress={() => setDeleteDialogVisible(true)}
-          />
+          <IconButton icon="pencil" onPress={navigateToEditDog} />
+          <IconButton icon="delete" onPress={() => setDeleteDialogVisible(true)} />
         </View>
       ),
     });
-  }, [navigation, dogId]);
-
-  const handleDeleteDog = () => {
-    deleteDog(dogId);
-    navigation.goBack();
-  };
+  }, [navigation, navigateToEditDog]);
 
   // Handle case where dog is not found
-  if (!dog) {
+  if (!dogData) {
     return (
       <View style={styles.container}>
         <Text>Dog not found</Text>
@@ -81,18 +120,18 @@ const DogDetailScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.profileSection}>
-        {dog.photo ? (
-          <Image source={{ uri: dog.photo }} style={styles.dogImage} />
+        {dogData.photo ? (
+          <Image source={{ uri: dogData.photo }} style={styles.dogImage} />
         ) : (
           <View style={[styles.dogImagePlaceholder, { backgroundColor: theme.colors.surfaceVariant }]}>
             <Text style={{ fontSize: 36 }}>🐕</Text>
           </View>
         )}
         <Text variant="headlineMedium" style={styles.dogName}>
-          {dog.name}
+          {dogData.name}
         </Text>
         <Text variant="bodyLarge" style={styles.dogBreed}>
-          {dog.breed}, {dog.age} years old
+          {dogData.breed}, {dogData.age} years old
         </Text>
       </View>
 
@@ -101,15 +140,17 @@ const DogDetailScreen = () => {
         <Card.Content>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text variant="headlineSmall">{totalSessions}</Text>
+              <Text variant="headlineSmall">{stats.totalSessions}</Text>
               <Text variant="bodyMedium">Sessions</Text>
             </View>
             <View style={styles.statItem}>
-              <Text variant="headlineSmall">{overallSuccessRate.toFixed(0)}%</Text>
+              <Text variant="headlineSmall">{stats.successRate.toFixed(0)}%</Text>
               <Text variant="bodyMedium">Success Rate</Text>
             </View>
             <View style={styles.statItem}>
-              <Text variant="headlineSmall">{lastTrainingDate ? formatDate(lastTrainingDate) : '-'}</Text>
+              <Text variant="headlineSmall">
+                {stats.lastTrainingDate ? formatDate(stats.lastTrainingDate) : '-'}
+              </Text>
               <Text variant="bodyMedium">Last Training</Text>
             </View>
           </View>
@@ -119,7 +160,7 @@ const DogDetailScreen = () => {
       <View style={styles.buttonContainer}>
         <Button 
           mode="contained" 
-          onPress={() => navigation.navigate('Training')}
+          onPress={navigateToTraining}
           icon="play"
         >
           Start Training Session
@@ -132,7 +173,7 @@ const DogDetailScreen = () => {
           <Dialog.Title>Delete Dog</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium">
-              Are you sure you want to delete {dog.name}? This action cannot be undone.
+              Are you sure you want to delete {dogData.name}? This action cannot be undone.
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
